@@ -642,6 +642,26 @@ func TestAccBigQueryTable_MaterializedView_NonIncremental_basic(t *testing.T) {
 	})
 }
 
+func TestAccBigQueryExternalDataTable_deltaLake(t *testing.T) {
+	t.Parallel()
+
+	bucketName := acctest.TestBucketName(t)
+
+	datasetID := fmt.Sprintf("tf_test_%s", acctest.RandString(t, 10))
+	tableID := fmt.Sprintf("tf_test_%s", acctest.RandString(t, 10))
+
+	acctest.VcrTest(t, resource.TestCase{
+		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		CheckDestroy:             testAccCheckBigQueryTableDestroyProducer(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccBigQueryTableFromGCSDeltaLake(datasetID, tableID, bucketName),
+			},
+		},
+	})
+}
+
 func TestAccBigQueryExternalDataTable_parquet(t *testing.T) {
 	t.Parallel()
 
@@ -1497,6 +1517,23 @@ func TestAccBigQueryTable_invalidSchemas(t *testing.T) {
 	})
 }
 
+func TestAccBigQueryTable_schemaWithRequiredFieldAndView(t *testing.T) {
+	datasetID := fmt.Sprintf("tf_test_%s", acctest.RandString(t, 10))
+	tableID := fmt.Sprintf("tf_test_%s", acctest.RandString(t, 10))
+
+	acctest.VcrTest(t, resource.TestCase{
+		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		CheckDestroy:             testAccCheckBigQueryTableDestroyProducer(t),
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccBigQueryTableWithSchemaWithRequiredFieldAndView(datasetID, tableID),
+				ExpectError: regexp.MustCompile("Schema cannot contain required fields when creating a view"),
+			},
+		},
+	})
+}
+
 func TestAccBigQueryTable_TableReplicationInfo_ConflictsWithView(t *testing.T) {
 	t.Parallel()
 
@@ -1610,7 +1647,7 @@ func TestAccBigQueryTable_ResourceTags(t *testing.T) {
 				ResourceName:            "google_bigquery_table.test",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"deletion_protection", "allow_resource_tags_on_deletion"},
+				ImportStateVerifyIgnore: []string{"deletion_protection"},
 			},
 			{
 				Config: testAccBigQueryTableWithResourceTagsUpdate(context),
@@ -1619,7 +1656,7 @@ func TestAccBigQueryTable_ResourceTags(t *testing.T) {
 				ResourceName:            "google_bigquery_table.test",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"deletion_protection", "allow_resource_tags_on_deletion"},
+				ImportStateVerifyIgnore: []string{"deletion_protection"},
 			},
 			// testAccBigQueryTableWithResourceTagsDestroy must be called at the end of this test to clear the resource tag bindings of the table before deletion.
 			{
@@ -1629,7 +1666,7 @@ func TestAccBigQueryTable_ResourceTags(t *testing.T) {
 				ResourceName:            "google_bigquery_table.test",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"deletion_protection", "allow_resource_tags_on_deletion"},
+				ImportStateVerifyIgnore: []string{"deletion_protection"},
 			},
 		},
 	})
@@ -2642,6 +2679,44 @@ resource "google_bigquery_table" "test" {
   ]
 }
 `, connectionID, datasetID, bucketName, objectName, tableID, metadataCacheMode, maxStaleness)
+}
+
+func testAccBigQueryTableFromGCSDeltaLake(datasetID, tableID, bucketName string) string {
+	return fmt.Sprintf(`
+resource "google_bigquery_dataset" "test" {
+  dataset_id = "%s"
+}
+
+resource "google_storage_bucket" "test" {
+  name          = "%s"
+  location      = "US"
+  force_destroy = true
+}
+
+# Setup Empty Delta Lake table in Bucket.
+
+// Upload Metadata File.
+resource "google_storage_bucket_object" "metadata" {
+	name    = "_delta_log/00000000000000000000.json"
+	source = "./test-fixtures/simple/metadata/00000000000000000000.json"
+	bucket = google_storage_bucket.test.name
+}
+
+resource "google_bigquery_table" "test" {
+  deletion_protection = false
+  table_id   = "%s"
+  dataset_id = google_bigquery_dataset.test.dataset_id
+  external_data_configuration {
+    autodetect    = true
+    source_format = "DELTA_LAKE"
+	reference_file_schema_uri = "gs://${google_storage_bucket.test.name}/${google_storage_bucket_object.metadata.name}"
+
+    source_uris = [
+      "gs://${google_storage_bucket.test.name}/*",
+    ]
+  }
+}
+`, datasetID, bucketName, tableID)
 }
 
 func testAccBigQueryTableFromGCSParquet(datasetID, tableID, bucketName, objectName string) string {
@@ -3982,6 +4057,42 @@ resource "google_bigquery_table" "test" {
 `, datasetID, tableID)
 }
 
+func testAccBigQueryTableWithSchemaWithRequiredFieldAndView(datasetID, tableID string) string {
+	return fmt.Sprintf(`
+resource "google_bigquery_dataset" "test" {
+  dataset_id = "%s"
+}
+
+resource "google_bigquery_table" "test" {
+  deletion_protection = false
+  table_id   = "%s"
+  dataset_id = google_bigquery_dataset.test.dataset_id
+  schema = <<EOF
+  [
+    {
+      "name": "requiredField",
+      "type": "STRING",
+      "mode": "REQUIRED",
+      "description": "requiredField"
+    },
+    {
+      "name": "optionalField",
+      "type": "STRING",
+      "mode": "NULLABLE",
+      "description": "optionalField"
+    }
+  ]
+  EOF
+  view {
+    query = <<EOF
+      SELECT 'a' AS requiredField, 'b' AS optionalField
+    EOF
+    use_legacy_sql = false
+  }
+}
+`, datasetID, tableID)
+}
+
 func testAccBigQueryTableWithReplicationInfo(projectID, sourceDatasetID, sourceTableID, sourceMVID, replicaDatasetID, replicaMVID, sourceMVJobID, dropMVJobID, replicationIntervalExpr string) string {
 	return fmt.Sprintf(`
 resource "google_bigquery_dataset" "source" {
@@ -4093,7 +4204,6 @@ resource "google_bigquery_dataset" "test" {
 
 resource "google_bigquery_table" "test" {
   deletion_protection = false
-  allow_resource_tags_on_deletion = true
   dataset_id = "${google_bigquery_dataset.test.dataset_id}"
   table_id   = "%{table_id}"
   resource_tags = {
@@ -4131,7 +4241,6 @@ resource "google_bigquery_dataset" "test" {
 
 resource "google_bigquery_table" "test" {
   deletion_protection = false
-  allow_resource_tags_on_deletion = true
   dataset_id = "${google_bigquery_dataset.test.dataset_id}"
   table_id   = "%{table_id}"
   resource_tags = {
@@ -4170,7 +4279,6 @@ resource "google_bigquery_dataset" "test" {
 
 resource "google_bigquery_table" "test" {
   deletion_protection = false
-  allow_resource_tags_on_deletion = true
   dataset_id = "${google_bigquery_dataset.test.dataset_id}"
   table_id   = "%{table_id}"
   resource_tags = {}

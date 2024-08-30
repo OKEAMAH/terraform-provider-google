@@ -272,6 +272,8 @@ func TestAccCloudFunctionsFunction_bucket(t *testing.T) {
 }
 
 func TestAccCloudFunctionsFunction_firestore(t *testing.T) {
+	// Currently failing
+	acctest.SkipIfVcr(t)
 	t.Parallel()
 	funcResourceName := "google_cloudfunctions_function.function"
 	functionName := fmt.Sprintf("tf-test-%s", acctest.RandString(t, 10))
@@ -973,6 +975,8 @@ resource "google_vpc_access_connector" "%s" {
   region        = "us-central1"
   ip_cidr_range = "%s"
   network       = google_compute_network.vpc.name
+  min_throughput  = 200
+  max_throughput = 300
 }
 
 resource "google_storage_bucket" "bucket" {

@@ -49,6 +49,7 @@ type FrameworkProviderConfig struct {
 	UniverseDomain             types.String
 	UserAgent                  string
 	UserProjectOverride        types.Bool
+	DefaultLabels              types.Map
 
 	// paths for client setup
 	AccessApprovalBasePath           string
@@ -99,7 +100,6 @@ type FrameworkProviderConfig struct {
 	DataplexBasePath                 string
 	DataprocBasePath                 string
 	DataprocMetastoreBasePath        string
-	DatastoreBasePath                string
 	DatastreamBasePath               string
 	DeploymentManagerBasePath        string
 	DialogflowBasePath               string
@@ -259,7 +259,6 @@ func (p *FrameworkProviderConfig) LoadAndValidateFramework(ctx context.Context, 
 	p.DataplexBasePath = data.DataplexCustomEndpoint.ValueString()
 	p.DataprocBasePath = data.DataprocCustomEndpoint.ValueString()
 	p.DataprocMetastoreBasePath = data.DataprocMetastoreCustomEndpoint.ValueString()
-	p.DatastoreBasePath = data.DatastoreCustomEndpoint.ValueString()
 	p.DatastreamBasePath = data.DatastreamCustomEndpoint.ValueString()
 	p.DeploymentManagerBasePath = data.DeploymentManagerCustomEndpoint.ValueString()
 	p.DialogflowBasePath = data.DialogflowCustomEndpoint.ValueString()
@@ -335,13 +334,13 @@ func (p *FrameworkProviderConfig) LoadAndValidateFramework(ctx context.Context, 
 
 	p.Context = ctx
 	p.BillingProject = data.BillingProject
+	p.DefaultLabels = data.DefaultLabels
 	p.Project = data.Project
 	p.Region = GetRegionFromRegionSelfLink(data.Region)
 	p.Scopes = data.Scopes
 	p.Zone = data.Zone
 	p.UserProjectOverride = data.UserProjectOverride
 	p.PollInterval = 10 * time.Second
-	p.Project = data.Project
 	p.UniverseDomain = data.UniverseDomain
 	p.RequestBatcherServiceUsage = transport_tpg.NewRequestBatcher("Service Usage", ctx, batchingConfig)
 	p.RequestBatcherIam = transport_tpg.NewRequestBatcher("IAM", ctx, batchingConfig)
@@ -841,14 +840,6 @@ func (p *FrameworkProviderConfig) HandleDefaults(ctx context.Context, data *fwmo
 		}, transport_tpg.DefaultBasePaths[transport_tpg.DataprocMetastoreBasePathKey])
 		if customEndpoint != nil {
 			data.DataprocMetastoreCustomEndpoint = types.StringValue(customEndpoint.(string))
-		}
-	}
-	if data.DatastoreCustomEndpoint.IsNull() {
-		customEndpoint := transport_tpg.MultiEnvDefault([]string{
-			"GOOGLE_DATASTORE_CUSTOM_ENDPOINT",
-		}, transport_tpg.DefaultBasePaths[transport_tpg.DatastoreBasePathKey])
-		if customEndpoint != nil {
-			data.DatastoreCustomEndpoint = types.StringValue(customEndpoint.(string))
 		}
 	}
 	if data.DatastreamCustomEndpoint.IsNull() {
@@ -1799,6 +1790,10 @@ func GetCredentials(ctx context.Context, data fwmodels.ProviderModel, initialCre
 		contents, _, err := verify.PathOrContents(data.Credentials.ValueString())
 		if err != nil {
 			diags.AddError(fmt.Sprintf("error loading credentials: %s", err), err.Error())
+			return googleoauth.Credentials{}
+		}
+		if len(contents) == 0 {
+			diags.AddError("error loading credentials", "provided credentials are empty")
 			return googleoauth.Credentials{}
 		}
 

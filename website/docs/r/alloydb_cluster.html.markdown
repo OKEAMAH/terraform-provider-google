@@ -177,8 +177,9 @@ resource "google_alloydb_cluster" "restored_from_backup" {
 resource "google_alloydb_cluster" "restored_via_pitr" {
   cluster_id             = "alloydb-pitr-restored"
   location               = "us-central1"
-  network                = data.google_compute_network.default.id
-
+  network_config {
+    network = data.google_compute_network.default.id
+  }
   restore_continuous_backup_source {
     cluster = google_alloydb_cluster.source.name
     point_in_time = "2023-08-03T19:19:00.094Z"
@@ -212,7 +213,9 @@ resource "google_service_networking_connection" "vpc_connection" {
 resource "google_alloydb_cluster" "primary" {
   cluster_id = "alloydb-primary-cluster"
   location   = "us-central1"
-  network    = google_compute_network.default.id
+  network_config {
+    network = google_compute_network.default.id
+  }
 }
 
 resource "google_alloydb_instance" "primary" {
@@ -230,7 +233,9 @@ resource "google_alloydb_instance" "primary" {
 resource "google_alloydb_cluster" "secondary" {
   cluster_id   = "alloydb-secondary-cluster"
   location     = "us-east1"
-  network      = google_compute_network.default.id
+  network_config {
+    network = google_compute_network.default.id
+  }
   cluster_type = "SECONDARY"
 
   continuous_backup_config {
@@ -292,13 +297,6 @@ The following arguments are supported:
   (Optional)
   EncryptionConfig describes the encryption config of a cluster or a backup that is encrypted with a CMEK (customer-managed encryption key).
   Structure is [documented below](#nested_encryption_config).
-
-* `network` -
-  (Optional, Deprecated)
-  The relative resource name of the VPC network on which the instance can be accessed. It is specified in the following form:
-  "projects/{projectNumber}/global/networks/{network_id}".
-
-  ~> **Warning:** `network` is deprecated and will be removed in a future major release. Instead, use `network_config` to define the network configuration.
 
 * `network_config` -
   (Optional)
@@ -372,12 +370,18 @@ The following arguments are supported:
   MaintenanceUpdatePolicy defines the policy for system updates.
   Structure is [documented below](#nested_maintenance_update_policy).
 
+* `subscription_type` -
+  (Optional)
+  The subscrition type of cluster.
+  Possible values are: `TRIAL`, `STANDARD`.
+
 * `project` - (Optional) The ID of the project in which the resource belongs.
     If it is not provided, the provider project is used.
 
 * `deletion_policy` - (Optional) Policy to determine if the cluster should be deleted forcefully.
 Deleting a cluster forcefully, deletes the cluster and all its associated instances within the cluster.
 Deleting a Secondary cluster with a secondary instance REQUIRES setting deletion_policy = "FORCE" otherwise an error is returned. This is needed as there is no support to delete just the secondary instance, and the only way to delete secondary instance is to delete the associated secondary cluster forcefully which also deletes the secondary instance.
+Possible values: DEFAULT, FORCE
 
 
 <a name="nested_encryption_config"></a>The `encryption_config` block supports:
@@ -627,6 +631,10 @@ In addition to the arguments listed above, the following computed attributes are
   Cluster created via DMS migration.
   Structure is [documented below](#nested_migration_source).
 
+* `trial_metadata` -
+  Contains information and all metadata related to TRIAL clusters.
+  Structure is [documented below](#nested_trial_metadata).
+
 * `terraform_labels` -
   The combination of labels configured directly on the resource
    and default labels configured on the provider.
@@ -697,6 +705,24 @@ In addition to the arguments listed above, the following computed attributes are
 * `source_type` -
   (Optional)
   Type of migration source.
+
+<a name="nested_trial_metadata"></a>The `trial_metadata` block contains:
+
+* `start_time` -
+  (Optional)
+  Start time of the trial cluster.
+
+* `end_time` -
+  (Optional)
+  End time of the trial cluster.
+
+* `upgrade_time` -
+  (Optional)
+  Upgrade time of the trial cluster to standard cluster.
+
+* `grace_end_time` -
+  (Optional)
+  Grace end time of the trial cluster.
 
 ## Timeouts
 

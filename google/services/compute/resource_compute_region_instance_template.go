@@ -73,11 +73,11 @@ func ResourceComputeRegionInstanceTemplate() *schema.Resource {
 				Description: `Creates a unique name beginning with the specified prefix. Conflicts with name.`,
 				ValidateFunc: func(v interface{}, k string) (ws []string, errors []error) {
 					// https://cloud.google.com/compute/docs/reference/latest/instanceTemplates#resource
-					// uuid is 26 characters, limit the prefix to 37.
+					// uuid is 9 characters, limit the prefix to 54.
 					value := v.(string)
-					if len(value) > 37 {
+					if len(value) > 54 {
 						errors = append(errors, fmt.Errorf(
-							"%q cannot be longer than 37 characters, name is limited to 63", k))
+							"%q cannot be longer than 54 characters, name is limited to 63", k))
 					}
 					return
 				},
@@ -924,7 +924,7 @@ be from 0 to 999,999,999 inclusive.`,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 				Set:      schema.HashString,
 				Description: `A set of key/value label pairs to assign to instances created from this template,
-				
+
 				**Note**: This field is non-authoritative, and will only manage the labels present in your configuration.
 				Please refer to the field 'effective_labels' for all of the labels present on the resource.`,
 			},
@@ -1085,7 +1085,12 @@ func resourceComputeRegionInstanceTemplateCreate(d *schema.ResourceData, meta in
 	if v, ok := d.GetOk("name"); ok {
 		itName = v.(string)
 	} else if v, ok := d.GetOk("name_prefix"); ok {
-		itName = id.PrefixedUniqueId(v.(string))
+		prefix := v.(string)
+		if len(prefix) > 37 {
+			itName = tpgresource.ReducedPrefixedUniqueId(prefix)
+		} else {
+			itName = id.PrefixedUniqueId(prefix)
+		}
 	} else {
 		itName = id.UniqueId()
 	}

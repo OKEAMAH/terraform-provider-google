@@ -80,11 +80,6 @@ The following arguments are supported:
   (Optional)
   Maximum number of queries that are allowed to run concurrently in this reservation. This is a soft limit due to asynchronous nature of the system and various optimizations for small queries. Default value is 0 which means that concurrency will be automatically set based on the reservation size.
 
-* `multi_region_auxiliary` -
-  (Optional)
-  Applicable only for reservations located within one of the BigQuery multi-regions (US or EU).
-  If set to true, this reservation is placed in the organization's secondary region which is designated for disaster recovery purposes. If false, this reservation is placed in the organization's default region.
-
 * `edition` -
   (Optional)
   The edition type. Valid values are STANDARD, ENTERPRISE, ENTERPRISE_PLUS

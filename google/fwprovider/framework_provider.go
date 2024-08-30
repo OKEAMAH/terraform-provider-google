@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-provider-google/google/fwmodels"
 	"github.com/hashicorp/terraform-provider-google/google/fwtransport"
 	"github.com/hashicorp/terraform-provider-google/google/services/resourcemanager"
+	"github.com/hashicorp/terraform-provider-google/version"
 
 	transport_tpg "github.com/hashicorp/terraform-provider-google/google/transport"
 )
@@ -31,9 +32,9 @@ var (
 )
 
 // New is a helper function to simplify provider server and testing implementation.
-func New(version string) provider.ProviderWithMetaSchema {
+func New() provider.ProviderWithMetaSchema {
 	return &FrameworkProvider{
-		Version: version,
+		Version: version.ProviderVersion,
 	}
 }
 
@@ -427,12 +428,6 @@ func (p *FrameworkProvider) Schema(_ context.Context, _ provider.SchemaRequest, 
 				},
 			},
 			"dataproc_metastore_custom_endpoint": &schema.StringAttribute{
-				Optional: true,
-				Validators: []validator.String{
-					transport_tpg.CustomEndpointValidator(),
-				},
-			},
-			"datastore_custom_endpoint": &schema.StringAttribute{
 				Optional: true,
 				Validators: []validator.String{
 					transport_tpg.CustomEndpointValidator(),
@@ -967,7 +962,8 @@ func (p *FrameworkProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	// Example client configuration for data sources and resources
+	// This is how we make provider configuration info (configured clients, default project, etc) available to resources and data sources
+	// implemented using the plugin-framework. The resources' Configure functions receive this data in the ConfigureRequest argument.
 	resp.DataSourceData = &p.FrameworkProviderConfig
 	resp.ResourceData = &p.FrameworkProviderConfig
 }

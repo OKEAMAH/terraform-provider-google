@@ -44,6 +44,7 @@ resource "google_folder" "autokms_folder" {
   provider     = google-beta
   display_name = "folder-example"
   parent       = "organizations/123456789"
+  deletion_protection = false
 }
 
 # Create the key project
@@ -54,6 +55,7 @@ resource "google_project" "key_project" {
   folder_id       = google_folder.autokms_folder.folder_id
   billing_account = "000000-0000000-0000000-000000"
   depends_on      = [google_folder.autokms_folder]
+  deletion_policy = "DELETE"
 }
 
 # Create the resource project
@@ -64,6 +66,7 @@ resource "google_project" "resource_project" {
   folder_id       = google_folder.autokms_folder.folder_id
   billing_account = "000000-0000000-0000000-000000"
   depends_on      = [google_folder.autokms_folder]
+  deletion_policy = "DELETE"
 }
 
 # Enable the Cloud KMS API
@@ -146,7 +149,7 @@ The following arguments are supported:
 * `resource_type_selector` -
   (Required)
   Selector of the resource type where we want to protect resources.
-  For example, `storage.googleapis.com/Bucket OR compute.googleapis.com/*`
+  For example, `storage.googleapis.com/Bucket`.
 
 * `location` -
   (Required)

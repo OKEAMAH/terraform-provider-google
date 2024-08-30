@@ -71,6 +71,18 @@ func schemaContainerdConfig() *schema.Schema {
 	}
 }
 
+// Note: this is a bool internally, but implementing as an enum internally to
+// make it easier to accept API level defaults.
+func schemaInsecureKubeletReadonlyPortEnabled() *schema.Schema {
+	return &schema.Schema{
+		Type:         schema.TypeString,
+		Optional:     true,
+		Computed:     true,
+		Description:  "Controls whether the kubelet read-only port is enabled. It is strongly recommended to set this to `FALSE`. Possible values: `TRUE`, `FALSE`.",
+		ValidateFunc: validation.StringInSlice([]string{"FALSE", "TRUE"}, false),
+	}
+}
+
 func schemaLoggingVariant() *schema.Schema {
 	return &schema.Schema{
 		Type:         schema.TypeString,
@@ -128,13 +140,10 @@ func schemaNodeConfig() *schema.Schema {
 				},
 
 				"guest_accelerator": {
-					Type:     schema.TypeList,
-					Optional: true,
-					Computed: true,
-					ForceNew: true,
-					// Legacy config mode allows removing GPU's from an existing resource
-					// See https://www.terraform.io/docs/configuration/attr-as-blocks.html
-					ConfigMode:  schema.SchemaConfigModeAttr,
+					Type:        schema.TypeList,
+					Optional:    true,
+					Computed:    true,
+					ForceNew:    true,
 					Description: `List of the type and count of accelerator cards attached to the instance.`,
 					Elem: &schema.Resource{
 						Schema: map[string]*schema.Schema{
@@ -155,8 +164,8 @@ func schemaNodeConfig() *schema.Schema {
 								Type:        schema.TypeList,
 								MaxItems:    1,
 								Optional:    true,
+								Computed:    true,
 								ForceNew:    true,
-								ConfigMode:  schema.SchemaConfigModeAttr,
 								Description: `Configuration for auto installation of GPU driver.`,
 								Elem: &schema.Resource{
 									Schema: map[string]*schema.Schema{
@@ -181,7 +190,6 @@ func schemaNodeConfig() *schema.Schema {
 								MaxItems:    1,
 								Optional:    true,
 								ForceNew:    true,
-								ConfigMode:  schema.SchemaConfigModeAttr,
 								Description: `Configuration for GPU sharing.`,
 								Elem: &schema.Resource{
 									Schema: map[string]*schema.Schema{
@@ -551,6 +559,7 @@ func schemaNodeConfig() *schema.Schema {
 								Optional:    true,
 								Description: `Set the CPU CFS quota period value 'cpu.cfs_period_us'.`,
 							},
+							"insecure_kubelet_readonly_port_enabled": schemaInsecureKubeletReadonlyPortEnabled(),
 							"pod_pids_limit": {
 								Type:        schema.TypeInt,
 								Optional:    true,
@@ -722,6 +731,22 @@ func schemaNodeConfig() *schema.Schema {
 	}
 }
 
+// Separate since this currently only supports a single value -- a subset of
+// the overall NodeKubeletConfig
+func schemaNodePoolAutoConfigNodeKubeletConfig() *schema.Schema {
+	return &schema.Schema{
+		Type:        schema.TypeList,
+		Optional:    true,
+		MaxItems:    1,
+		Description: `Node kubelet configs.`,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"insecure_kubelet_readonly_port_enabled": schemaInsecureKubeletReadonlyPortEnabled(),
+			},
+		},
+	}
+}
+
 func expandNodeConfigDefaults(configured interface{}) *container.NodeConfigDefaults {
 	configs := configured.([]interface{})
 	if len(configs) == 0 || configs[0] == nil {
@@ -731,6 +756,12 @@ func expandNodeConfigDefaults(configured interface{}) *container.NodeConfigDefau
 
 	nodeConfigDefaults := &container.NodeConfigDefaults{}
 	nodeConfigDefaults.ContainerdConfig = expandContainerdConfig(config["containerd_config"])
+	if v, ok := config["insecure_kubelet_readonly_port_enabled"]; ok {
+		nodeConfigDefaults.NodeKubeletConfig = &container.NodeKubeletConfig{
+			InsecureKubeletReadonlyPortEnabled: expandInsecureKubeletReadonlyPortEnabled(v),
+			ForceSendFields:                    []string{"InsecureKubeletReadonlyPortEnabled"},
+		}
+	}
 	if variant, ok := config["logging_variant"]; ok {
 		nodeConfigDefaults.LoggingConfig = &container.NodePoolLoggingConfig{
 			VariantConfig: &container.LoggingVariantConfig{
@@ -1023,6 +1054,10 @@ func expandNodeConfig(v interface{}) *container.NodeConfig {
 }
 
 func expandResourceManagerTags(v interface{}) *container.ResourceManagerTags {
+	if v == nil {
+		return nil
+	}
+
 	rmts := make(map[string]string)
 
 	if v != nil {
@@ -1054,6 +1089,13 @@ func expandWorkloadMetadataConfig(v interface{}) *container.WorkloadMetadataConf
 	return wmc
 }
 
+func expandInsecureKubeletReadonlyPortEnabled(v interface{}) bool {
+	if v == "TRUE" {
+		return true
+	}
+	return false
+}
+
 func expandKubeletConfig(v interface{}) *container.NodeKubeletConfig {
 	if v == nil {
 		return nil
@@ -1073,6 +1115,10 @@ func expandKubeletConfig(v interface{}) *container.NodeKubeletConfig {
 	}
 	if cpuCfsQuotaPeriod, ok := cfg["cpu_cfs_quota_period"]; ok {
 		kConfig.CpuCfsQuotaPeriod = cpuCfsQuotaPeriod.(string)
+	}
+	if insecureKubeletReadonlyPortEnabled, ok := cfg["insecure_kubelet_readonly_port_enabled"]; ok {
+		kConfig.InsecureKubeletReadonlyPortEnabled = expandInsecureKubeletReadonlyPortEnabled(insecureKubeletReadonlyPortEnabled)
+		kConfig.ForceSendFields = append(kConfig.ForceSendFields, "InsecureKubeletReadonlyPortEnabled")
 	}
 	if podPidsLimit, ok := cfg["pod_pids_limit"]; ok {
 		kConfig.PodPidsLimit = int64(podPidsLimit.(int))
@@ -1263,6 +1309,8 @@ func flattenNodeConfigDefaults(c *container.NodeConfigDefaults) []map[string]int
 
 	result[0]["containerd_config"] = flattenContainerdConfig(c.ContainerdConfig)
 
+	result[0]["insecure_kubelet_readonly_port_enabled"] = flattenInsecureKubeletReadonlyPortEnabled(c.NodeKubeletConfig)
+
 	result[0]["logging_variant"] = flattenLoggingVariant(c.LoggingConfig)
 
 	return result
@@ -1333,6 +1381,10 @@ func flattenNodeConfig(c *container.NodeConfig, v interface{}) []map[string]inte
 }
 
 func flattenResourceManagerTags(c *container.ResourceManagerTags) map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+
 	rmt := make(map[string]interface{})
 
 	if c != nil {
@@ -1428,6 +1480,14 @@ func flattenSecondaryBootDisks(c []*container.SecondaryBootDisk) []map[string]in
 	return result
 }
 
+func flattenInsecureKubeletReadonlyPortEnabled(c *container.NodeKubeletConfig) string {
+	// Convert bool from the API to the enum values used internally
+	if c != nil && c.InsecureKubeletReadonlyPortEnabled {
+		return "TRUE"
+	}
+	return "FALSE"
+}
+
 func flattenLoggingVariant(c *container.NodePoolLoggingConfig) string {
 	variant := "DEFAULT"
 	if c != nil && c.VariantConfig != nil && c.VariantConfig.Variant != "" {
@@ -1519,10 +1579,21 @@ func flattenKubeletConfig(c *container.NodeKubeletConfig) []map[string]interface
 	result := []map[string]interface{}{}
 	if c != nil {
 		result = append(result, map[string]interface{}{
-			"cpu_cfs_quota":        c.CpuCfsQuota,
-			"cpu_cfs_quota_period": c.CpuCfsQuotaPeriod,
-			"cpu_manager_policy":   c.CpuManagerPolicy,
-			"pod_pids_limit":       c.PodPidsLimit,
+			"cpu_cfs_quota":                          c.CpuCfsQuota,
+			"cpu_cfs_quota_period":                   c.CpuCfsQuotaPeriod,
+			"cpu_manager_policy":                     c.CpuManagerPolicy,
+			"insecure_kubelet_readonly_port_enabled": flattenInsecureKubeletReadonlyPortEnabled(c),
+			"pod_pids_limit":                         c.PodPidsLimit,
+		})
+	}
+	return result
+}
+
+func flattenNodePoolAutoConfigNodeKubeletConfig(c *container.NodeKubeletConfig) []map[string]interface{} {
+	result := []map[string]interface{}{}
+	if c != nil {
+		result = append(result, map[string]interface{}{
+			"insecure_kubelet_readonly_port_enabled": flattenInsecureKubeletReadonlyPortEnabled(c),
 		})
 	}
 	return result

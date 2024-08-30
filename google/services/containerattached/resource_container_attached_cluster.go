@@ -72,7 +72,8 @@ func ResourceContainerAttachedCluster() *schema.Resource {
 				Required: true,
 				ForceNew: true,
 				Description: `The Kubernetes distribution of the underlying attached cluster. Supported values:
-"eks", "aks".`,
+"eks", "aks", "generic". The generic distribution provides the ability to register
+or migrate any CNCF conformant cluster.`,
 			},
 			"fleet": {
 				Type:        schema.TypeList,
@@ -395,8 +396,8 @@ the Workload Identity Pool.`,
 			"deletion_policy": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Description: `Policy to determine what flags to send on delete. Possible values: DELETE, DELETE_IGNORE_ERRORS`,
 				Default:     "DELETE",
-				Description: `Policy to determine what flags to send on delete.`,
 			},
 			"project": {
 				Type:     schema.TypeString,

@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-provider-google/google/acctest"
+	"github.com/hashicorp/terraform-provider-google/google/envvar"
 )
 
 func TestAccCloudRunV2Job_cloudrunv2JobFullUpdate(t *testing.T) {
@@ -38,7 +39,7 @@ func TestAccCloudRunV2Job_cloudrunv2JobFullUpdate(t *testing.T) {
 				ResourceName:            "google_cloud_run_v2_job.default",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"location", "launch_stage", "labels", "terraform_labels", "annotations"},
+				ImportStateVerifyIgnore: []string{"location", "launch_stage", "labels", "terraform_labels", "annotations", "deletion_protection"},
 			},
 		},
 	})
@@ -117,6 +118,7 @@ func testAccCloudRunV2Job_cloudrunv2JobFullUpdate(context map[string]interface{}
 resource "google_cloud_run_v2_job" "default" {
   name     = "tf-test-cloudrun-job%{random_suffix}"
   location = "us-central1"
+  deletion_protection = false
   binary_authorization {
     use_default = true
     breakglass_justification = "Some justification"
@@ -214,6 +216,7 @@ func TestAccCloudRunV2Job_cloudrunv2JobWithDirectVPCUpdate(t *testing.T) {
 	jobName := fmt.Sprintf("tf-test-cloudrun-service%s", acctest.RandString(t, 10))
 	context := map[string]interface{}{
 		"job_name": jobName,
+		"project":  envvar.GetTestProjectFromEnv(),
 	}
 
 	acctest.VcrTest(t, resource.TestCase{
@@ -228,16 +231,16 @@ func TestAccCloudRunV2Job_cloudrunv2JobWithDirectVPCUpdate(t *testing.T) {
 				ResourceName:            "google_cloud_run_v2_job.default",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"location", "launch_stage"},
+				ImportStateVerifyIgnore: []string{"location", "launch_stage", "deletion_protection"},
 			},
 			{
-				Config: testAccCloudRunV2Job_cloudrunv2JobWithDirectVPCUpdate(context),
+				Config: testAccCloudRunV2Job_cloudrunv2JobWithDirectVPCAndNamedBinAuthPolicyUpdate(context),
 			},
 			{
 				ResourceName:            "google_cloud_run_v2_job.default",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"location", "launch_stage"},
+				ImportStateVerifyIgnore: []string{"location", "launch_stage", "deletion_protection"},
 			},
 		},
 	})
@@ -248,6 +251,7 @@ func testAccCloudRunV2Job_cloudrunv2JobWithDirectVPC(context map[string]interfac
   resource "google_cloud_run_v2_job" "default" {
     name     = "%{job_name}"
     location = "us-central1"
+    deletion_protection = false
     launch_stage = "BETA"
     template {
       template {
@@ -271,12 +275,17 @@ func testAccCloudRunV2Job_cloudrunv2JobWithDirectVPC(context map[string]interfac
 `, context)
 }
 
-func testAccCloudRunV2Job_cloudrunv2JobWithDirectVPCUpdate(context map[string]interface{}) string {
+func testAccCloudRunV2Job_cloudrunv2JobWithDirectVPCAndNamedBinAuthPolicyUpdate(context map[string]interface{}) string {
 	return acctest.Nprintf(`
   resource "google_cloud_run_v2_job" "default" {
     name     = "%{job_name}"
     location = "us-central1"
+    deletion_protection = false
     launch_stage = "BETA"
+    binary_authorization {
+      policy = "projects/%{project}/platforms/cloudRun/policies/my-policy"
+      breakglass_justification = "Some justification"
+    }
     template {
       template {
         containers {

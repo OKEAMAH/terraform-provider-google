@@ -142,8 +142,6 @@ unique per project and between 4 and 30 characters in length.`,
 				Description: `A unique identifier for the instance, which cannot be changed after
 the instance is created. The name must be between 6 and 30 characters
 in length.
-
-
 If not provided, a random string starting with 'tf-' will be selected.`,
 			},
 			"autoscaling_config": {
@@ -279,9 +277,9 @@ or node_count must be present in terraform.`,
 			"force_destroy": {
 				Type:     schema.TypeBool,
 				Optional: true,
-				Default:  false,
 				Description: `When deleting a spanner instance, this boolean option will delete all backups of this instance.
 This must be set to true if you created a backup manually in the console.`,
+				Default: false,
 			},
 			"project": {
 				Type:     schema.TypeString,

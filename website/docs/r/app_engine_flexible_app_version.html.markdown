@@ -43,6 +43,7 @@ resource "google_project" "my_project" {
   project_id = "appeng-flex"
   org_id = "123456789"
   billing_account = "000000-0000000-0000000-000000"
+  deletion_policy = "DELETE"
 }
 
 resource "google_app_engine_application" "app" {
@@ -86,6 +87,10 @@ resource "google_app_engine_flexible_app_version" "myapp_v1" {
   project    = google_project_iam_member.gae_api.project
   service    = "default"
   runtime    = "nodejs"
+  flexible_runtime_settings {
+    operating_system = "ubuntu22"
+    runtime_version = "20"
+  }
 
   entrypoint {
     shell = "node ./app.js"

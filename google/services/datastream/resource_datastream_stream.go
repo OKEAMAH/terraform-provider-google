@@ -158,7 +158,7 @@ historical state of the data.`,
 										Elem: &schema.Resource{
 											Schema: map[string]*schema.Schema{},
 										},
-										ExactlyOneOf: []string{"destination_config.0.bigquery_destination_config.0.merge", "destination_config.0.bigquery_destination_config.0.append_only"},
+										ConflictsWith: []string{"destination_config.0.bigquery_destination_config.0.merge"},
 									},
 									"data_freshness": {
 										Type:     schema.TypeString,
@@ -179,7 +179,7 @@ in the source database. With Merge mode, no historical record of the change even
 										Elem: &schema.Resource{
 											Schema: map[string]*schema.Schema{},
 										},
-										ExactlyOneOf: []string{"destination_config.0.bigquery_destination_config.0.merge", "destination_config.0.bigquery_destination_config.0.append_only"},
+										ConflictsWith: []string{"destination_config.0.bigquery_destination_config.0.append_only"},
 									},
 									"single_target_dataset": {
 										Type:        schema.TypeList,
@@ -991,6 +991,16 @@ negative. If not set (or set to 0), the system's default value will be used.`,
 							MaxItems:    1,
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
+									"change_tables": {
+										Type:        schema.TypeList,
+										Optional:    true,
+										Description: `CDC reader reads from change tables.`,
+										MaxItems:    1,
+										Elem: &schema.Resource{
+											Schema: map[string]*schema.Schema{},
+										},
+										ConflictsWith: []string{},
+									},
 									"exclude_objects": {
 										Type:        schema.TypeList,
 										Optional:    true,
@@ -1186,6 +1196,16 @@ https://learn.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql?v
 										Optional:     true,
 										ValidateFunc: validation.IntAtLeast(0),
 										Description:  `Max concurrent CDC tasks.`,
+									},
+									"transaction_logs": {
+										Type:        schema.TypeList,
+										Optional:    true,
+										Description: `CDC reader reads from transaction logs.`,
+										MaxItems:    1,
+										Elem: &schema.Resource{
+											Schema: map[string]*schema.Schema{},
+										},
+										ConflictsWith: []string{},
 									},
 								},
 							},
@@ -1632,10 +1652,11 @@ Please refer to the field 'effective_labels' for all of the labels present on th
 				Elem: &schema.Schema{Type: schema.TypeString},
 			},
 			"desired_state": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "NOT_STARTED",
-				Description: `Desired state of the Stream. Set this field to 'RUNNING' to start the stream, and 'PAUSED' to pause the stream.`,
+				Type:     schema.TypeString,
+				Optional: true,
+				Description: `Desired state of the Stream. Set this field to 'RUNNING' to start the stream, and 'PAUSED' to pause the stream.
+Possible values: NOT_STARTED, RUNNING, PAUSED. Default: NOT_STARTED`,
+				Default: "NOT_STARTED",
 			},
 			"project": {
 				Type:     schema.TypeString,
@@ -3298,6 +3319,10 @@ func flattenDatastreamStreamSourceConfigSqlServerSourceConfig(v interface{}, d *
 		flattenDatastreamStreamSourceConfigSqlServerSourceConfigMaxConcurrentCdcTasks(original["maxConcurrentCdcTasks"], d, config)
 	transformed["max_concurrent_backfill_tasks"] =
 		flattenDatastreamStreamSourceConfigSqlServerSourceConfigMaxConcurrentBackfillTasks(original["maxConcurrentBackfillTasks"], d, config)
+	transformed["transaction_logs"] =
+		flattenDatastreamStreamSourceConfigSqlServerSourceConfigTransactionLogs(original["transactionLogs"], d, config)
+	transformed["change_tables"] =
+		flattenDatastreamStreamSourceConfigSqlServerSourceConfigChangeTables(original["changeTables"], d, config)
 	return []interface{}{transformed}
 }
 func flattenDatastreamStreamSourceConfigSqlServerSourceConfigIncludeObjects(v interface{}, d *schema.ResourceData, config *transport_tpg.Config) interface{} {
@@ -3668,6 +3693,22 @@ func flattenDatastreamStreamSourceConfigSqlServerSourceConfigMaxConcurrentBackfi
 	}
 
 	return v // let terraform core handle it otherwise
+}
+
+func flattenDatastreamStreamSourceConfigSqlServerSourceConfigTransactionLogs(v interface{}, d *schema.ResourceData, config *transport_tpg.Config) interface{} {
+	if v == nil {
+		return nil
+	}
+	transformed := make(map[string]interface{})
+	return []interface{}{transformed}
+}
+
+func flattenDatastreamStreamSourceConfigSqlServerSourceConfigChangeTables(v interface{}, d *schema.ResourceData, config *transport_tpg.Config) interface{} {
+	if v == nil {
+		return nil
+	}
+	transformed := make(map[string]interface{})
+	return []interface{}{transformed}
 }
 
 func flattenDatastreamStreamDestinationConfig(v interface{}, d *schema.ResourceData, config *transport_tpg.Config) interface{} {
@@ -6004,6 +6045,20 @@ func expandDatastreamStreamSourceConfigSqlServerSourceConfig(v interface{}, d tp
 		transformed["maxConcurrentBackfillTasks"] = transformedMaxConcurrentBackfillTasks
 	}
 
+	transformedTransactionLogs, err := expandDatastreamStreamSourceConfigSqlServerSourceConfigTransactionLogs(original["transaction_logs"], d, config)
+	if err != nil {
+		return nil, err
+	} else {
+		transformed["transactionLogs"] = transformedTransactionLogs
+	}
+
+	transformedChangeTables, err := expandDatastreamStreamSourceConfigSqlServerSourceConfigChangeTables(original["change_tables"], d, config)
+	if err != nil {
+		return nil, err
+	} else {
+		transformed["changeTables"] = transformedChangeTables
+	}
+
 	return transformed, nil
 }
 
@@ -6389,6 +6444,36 @@ func expandDatastreamStreamSourceConfigSqlServerSourceConfigMaxConcurrentCdcTask
 
 func expandDatastreamStreamSourceConfigSqlServerSourceConfigMaxConcurrentBackfillTasks(v interface{}, d tpgresource.TerraformResourceData, config *transport_tpg.Config) (interface{}, error) {
 	return v, nil
+}
+
+func expandDatastreamStreamSourceConfigSqlServerSourceConfigTransactionLogs(v interface{}, d tpgresource.TerraformResourceData, config *transport_tpg.Config) (interface{}, error) {
+	l := v.([]interface{})
+	if len(l) == 0 {
+		return nil, nil
+	}
+
+	if l[0] == nil {
+		transformed := make(map[string]interface{})
+		return transformed, nil
+	}
+	transformed := make(map[string]interface{})
+
+	return transformed, nil
+}
+
+func expandDatastreamStreamSourceConfigSqlServerSourceConfigChangeTables(v interface{}, d tpgresource.TerraformResourceData, config *transport_tpg.Config) (interface{}, error) {
+	l := v.([]interface{})
+	if len(l) == 0 {
+		return nil, nil
+	}
+
+	if l[0] == nil {
+		transformed := make(map[string]interface{})
+		return transformed, nil
+	}
+	transformed := make(map[string]interface{})
+
+	return transformed, nil
 }
 
 func expandDatastreamStreamDestinationConfig(v interface{}, d tpgresource.TerraformResourceData, config *transport_tpg.Config) (interface{}, error) {

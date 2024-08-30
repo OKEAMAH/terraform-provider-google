@@ -40,6 +40,7 @@ To get more information about Job, see:
 resource "google_cloud_run_v2_job" "default" {
   name     = "cloudrun-job"
   location = "us-central1"
+  deletion_protection = false
 
   template {
     template {
@@ -62,6 +63,7 @@ resource "google_cloud_run_v2_job" "default" {
 resource "google_cloud_run_v2_job" "default" {
   name     = "cloudrun-job"
   location = "us-central1"
+  deletion_protection = false
 
   template {
     template {
@@ -96,7 +98,7 @@ resource "google_cloud_run_v2_job" "default" {
 resource "google_cloud_run_v2_job" "default" {
   name     = "cloudrun-job"
   location = "us-central1"
-  
+  deletion_protection = false
   template {
     template{
       volumes {
@@ -176,6 +178,7 @@ resource "google_sql_database_instance" "instance" {
 resource "google_cloud_run_v2_job" "default" {
   name     = "cloudrun-job"
   location = "us-central1"
+  deletion_protection = false
 
   template {
     template{
@@ -223,6 +226,7 @@ resource "google_compute_network" "custom_test" {
 resource "google_cloud_run_v2_job" "default" {
   name     = "cloudrun-job"
   location = "us-central1"
+  deletion_protection = false
   launch_stage = "GA"
   template {
     template{
@@ -252,6 +256,7 @@ resource "google_cloud_run_v2_job" "default" {
 resource "google_cloud_run_v2_job" "default" {
   name     = "cloudrun-job"
   location = "us-central1"
+  deletion_protection = false
 
   template {
     template {
@@ -318,6 +323,7 @@ resource "google_cloud_run_v2_job" "default" {
   provider = google-beta
   name     = "cloudrun-job"
   location = "us-central1"
+  deletion_protection = false
   launch_stage = "BETA"
   template {
     template {
@@ -352,6 +358,7 @@ resource "google_cloud_run_v2_job" "default" {
   provider = google-beta
   name     = "cloudrun-job"
   location = "us-central1"
+  deletion_protection = false
   start_execution_token = "start-once-created"
   template {
     template {
@@ -469,7 +476,7 @@ The following arguments are supported:
 
 * `args` -
   (Optional)
-  Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
+  Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references are not supported in Cloud Run.
 
 * `env` -
   (Optional)
@@ -505,7 +512,7 @@ The following arguments are supported:
 
 * `value` -
   (Optional)
-  Variable references $(VAR_NAME) are expanded using the previous defined environment variables in the container and any route environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to "", and the maximum length is 32768 bytes
+  Literal value of the environment variable. Defaults to "" and the maximum allowed length is 32768 characters. Variable references are not supported in Cloud Run.
 
 * `value_source` -
   (Optional)
@@ -750,6 +757,13 @@ The following arguments are supported:
 * `project` - (Optional) The ID of the project in which the resource belongs.
     If it is not provided, the provider project is used.
 
+* `deletion_protection` - (Optional) Whether Terraform will be prevented from destroying the job. Defaults to true.
+When a`terraform destroy` or `terraform apply` would delete the job,
+the command will fail if this field is not set to false in Terraform state.
+When the field is set to true or unset in Terraform state, a `terraform apply`
+or `terraform destroy` that would delete the job will fail.
+When the field is set to false, deleting the job is allowed.
+
 
 <a name="nested_binary_authorization"></a>The `binary_authorization` block supports:
 
@@ -760,6 +774,10 @@ The following arguments are supported:
 * `use_default` -
   (Optional)
   If True, indicates to use the default project's binary authorization policy. If False, binary authorization will be disabled.
+
+* `policy` -
+  (Optional)
+  The path to a binary authorization policy. Format: projects/{project}/platforms/cloudRun/{policy-name}
 
 ## Attributes Reference
 
